@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm-regime"
+version = "0.1.0"
+description = "LLM-powered market regime detection using visual chart analysis"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "matplotlib>=3.7",
+    "Pillow>=10.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.30"]
+openai = ["openai>=1.30"]
+google = ["google-genai>=1.0"]
+ollama = ["ollama>=0.3"]
+all = ["anthropic>=0.30", "openai>=1.30", "google-genai>=1.0", "ollama>=0.3"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

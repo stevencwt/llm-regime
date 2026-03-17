@@ -1,0 +1,26 @@
+# llm-regime default configuration
+version: "0.1.0"
+
+# LLM provider settings
+provider:
+  name: "anthropic"                  # anthropic | openai | gemini | ollama
+  model: null                        # null = use provider default
+  temperature: 0.1                   # low for consistency
+  max_tokens: 1000
+
+# Chart generation
+chart:
+  sma_periods: [20, 50]
+  dpi: 100
+  figsize: [16, 8]
+
+# Cache settings
+cache:
+  ttl_seconds: 1800                  # 30 minutes
+  persist_path: null                 # null = memory only
+
+# Analysis settings
+analysis:
+  min_bars: 50                       # minimum bars for valid analysis
+  multi_timeframe: false             # analyze multiple TFs in one call
+  quantitative_context: true         # include SMA/ATR data in prompt
