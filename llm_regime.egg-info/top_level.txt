@@ -1,4 +1,0 @@
-config
-examples
-llm_regime
-tests
