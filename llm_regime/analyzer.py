@@ -481,10 +481,37 @@ class RegimeAnalyzer:
         key_levels = data.get("key_levels", [])
         if isinstance(key_levels, list):
             result.key_levels = [
-                {"price": kl.get("price", 0), "type": kl.get("type", ""), "strength": kl.get("strength", "moderate")}
+                {
+                    "price": kl.get("price", 0),
+                    "type": kl.get("type", ""),
+                    "strength": kl.get("strength", "moderate"),
+                    "reason": kl.get("reason", ""),
+                }
                 for kl in key_levels
                 if isinstance(kl, dict) and "price" in kl
             ]
+
+        # Parse structure (new field)
+        raw_structure = data.get("structure", {})
+        if isinstance(raw_structure, dict):
+            result.structure = {
+                "hh_hl": bool(raw_structure.get("hh_hl", False)),
+                "lh_ll": bool(raw_structure.get("lh_ll", False)),
+                "broken": bool(raw_structure.get("broken", False)),
+                "summary": str(raw_structure.get("summary", "")),
+            }
+
+        # Parse nearest_zone (new field)
+        raw_zone = data.get("nearest_zone", {})
+        if isinstance(raw_zone, dict):
+            result.nearest_zone = {
+                "price": float(raw_zone.get("price", 0.0)),
+                "type": str(raw_zone.get("type", "")),
+                "quality": str(raw_zone.get("quality", "low")),
+                "distance_pct": round(float(raw_zone.get("distance_pct", 0.0)), 2),
+                "rationale": str(raw_zone.get("rationale", "")),
+                "tradeable": bool(raw_zone.get("tradeable", False)),
+            }
 
         return result
 

@@ -17,24 +17,43 @@ class TestRegimeResult:
         assert r.regime == "UNKNOWN"
         assert r.confidence == 0
         assert r.bias == "NEUTRAL"
+        assert r.structure == {}
+        assert r.nearest_zone == {}
 
     def test_to_dict(self):
         r = RegimeResult(regime="UPTREND", confidence=4, bias="BULLISH")
         d = r.to_dict()
         assert d["regime"] == "UPTREND"
         assert d["confidence"] == 4
+        assert "structure" in d
+        assert "nearest_zone" in d
 
     def test_to_json(self):
         r = RegimeResult(regime="RANGING", confidence=3)
         j = r.to_json()
         parsed = json.loads(j)
         assert parsed["regime"] == "RANGING"
+        assert "structure" in parsed
+        assert "nearest_zone" in parsed
 
     def test_from_dict(self):
         d = {"regime": "DOWNTREND", "confidence": 2, "bias": "BEARISH"}
         r = RegimeResult.from_dict(d)
         assert r.regime == "DOWNTREND"
         assert r.is_bearish
+
+    def test_from_dict_with_new_fields(self):
+        d = {
+            "regime": "UPTREND",
+            "confidence": 4,
+            "structure": {"hh_hl": True, "lh_ll": False, "broken": False, "summary": "Three HH/HL intact"},
+            "nearest_zone": {"price": 83200.0, "type": "support", "quality": "high",
+                             "distance_pct": 1.43, "rationale": "Prior breakout level", "tradeable": True},
+        }
+        r = RegimeResult.from_dict(d)
+        assert r.structure["hh_hl"] is True
+        assert r.nearest_zone["tradeable"] is True
+        assert r.nearest_zone["price"] == 83200.0
 
     def test_is_bullish(self):
         assert RegimeResult(regime="UPTREND").is_bullish
@@ -95,6 +114,16 @@ class TestPrompts:
         assert "STRONG_UPTREND" in SYSTEM_PROMPT
         assert "JSON" in SYSTEM_PROMPT
 
+    def test_system_prompt_has_new_fields(self):
+        assert "structure" in SYSTEM_PROMPT
+        assert "nearest_zone" in SYSTEM_PROMPT
+        assert "hh_hl" in SYSTEM_PROMPT
+        assert "tradeable" in SYSTEM_PROMPT
+        assert "distance_pct" in SYSTEM_PROMPT
+
+    def test_system_prompt_has_key_level_reason(self):
+        assert '"reason"' in SYSTEM_PROMPT
+
     def test_build_prompt_basic(self):
         p = build_regime_prompt(asset="BTC", timeframe="5m", bars=500)
         assert "BTC" in p
@@ -138,6 +167,128 @@ class TestCache:
         import time
         time.sleep(0.01)
         assert cache.get("BTC", "5m") is None
+
+
+class TestNewFields:
+    """Test parsing of structure and nearest_zone from LLM JSON responses."""
+
+    def _make_analyzer(self):
+        from llm_regime.analyzer import RegimeAnalyzer
+        from unittest.mock import MagicMock
+        analyzer = RegimeAnalyzer.__new__(RegimeAnalyzer)
+        analyzer._provider = MagicMock()
+        analyzer._cache = MagicMock()
+        analyzer._temperature = 0.1
+        analyzer._sma_periods = (20, 50)
+        analyzer._chart_dpi = 100
+        return analyzer
+
+    def _full_json(self, **overrides):
+        base = {
+            "regime": "UPTREND",
+            "confidence": 4,
+            "volatility": "MODERATE",
+            "trend_strength": "MODERATE",
+            "bias": "BULLISH",
+            "scalp_direction": "LONG_ONLY",
+            "key_levels": [
+                {"price": 83200, "type": "support", "strength": "strong", "reason": "prior breakout level"},
+                {"price": 85500, "type": "resistance", "strength": "moderate", "reason": "recent swing high"},
+            ],
+            "reasoning": "Three HH/HL swings visible above the 20 SMA.",
+            "pattern": "bull flag",
+            "structure": {
+                "hh_hl": True,
+                "lh_ll": False,
+                "broken": False,
+                "summary": "Three HH/HL swings intact",
+            },
+            "nearest_zone": {
+                "price": 83200.0,
+                "type": "support",
+                "quality": "high",
+                "distance_pct": 1.43,
+                "rationale": "Prior breakout level tested twice",
+                "tradeable": True,
+            },
+        }
+        base.update(overrides)
+        return json.dumps(base)
+
+    def test_parse_structure(self):
+        analyzer = self._make_analyzer()
+        result = analyzer._parse_response(self._full_json(), "BTC", "5m", 200)
+        assert result.structure["hh_hl"] is True
+        assert result.structure["lh_ll"] is False
+        assert result.structure["broken"] is False
+        assert "intact" in result.structure["summary"]
+
+    def test_parse_nearest_zone(self):
+        analyzer = self._make_analyzer()
+        result = analyzer._parse_response(self._full_json(), "BTC", "5m", 200)
+        assert result.nearest_zone["price"] == 83200.0
+        assert result.nearest_zone["type"] == "support"
+        assert result.nearest_zone["quality"] == "high"
+        assert result.nearest_zone["distance_pct"] == 1.43
+        assert result.nearest_zone["tradeable"] is True
+
+    def test_parse_key_level_reason(self):
+        analyzer = self._make_analyzer()
+        result = analyzer._parse_response(self._full_json(), "BTC", "5m", 200)
+        assert result.key_levels[0]["reason"] == "prior breakout level"
+        assert result.key_levels[1]["reason"] == "recent swing high"
+
+    def test_key_level_missing_reason_defaults_to_empty(self):
+        """Old-format key_levels without 'reason' should still parse cleanly."""
+        data = json.loads(self._full_json())
+        for kl in data["key_levels"]:
+            del kl["reason"]
+        analyzer = self._make_analyzer()
+        result = analyzer._parse_response(json.dumps(data), "BTC", "5m", 200)
+        assert result.key_levels[0]["reason"] == ""
+
+    def test_missing_structure_defaults_to_safe_values(self):
+        """When LLM omits 'structure', parser should produce a safe all-false default."""
+        data = json.loads(self._full_json())
+        del data["structure"]
+        analyzer = self._make_analyzer()
+        result = analyzer._parse_response(json.dumps(data), "BTC", "5m", 200)
+        assert result.structure["hh_hl"] is False
+        assert result.structure["lh_ll"] is False
+        assert result.structure["broken"] is False
+        assert result.structure["summary"] == ""
+
+    def test_missing_nearest_zone_defaults_to_safe_values(self):
+        """When LLM omits 'nearest_zone', parser should produce a safe low-quality default."""
+        data = json.loads(self._full_json())
+        del data["nearest_zone"]
+        analyzer = self._make_analyzer()
+        result = analyzer._parse_response(json.dumps(data), "BTC", "5m", 200)
+        assert result.nearest_zone["price"] == 0.0
+        assert result.nearest_zone["quality"] == "low"
+        assert result.nearest_zone["tradeable"] is False
+        assert result.nearest_zone["rationale"] == ""
+
+    def test_distance_pct_rounded_to_2dp(self):
+        data = json.loads(self._full_json())
+        data["nearest_zone"]["distance_pct"] = 1.4285714
+        analyzer = self._make_analyzer()
+        result = analyzer._parse_response(json.dumps(data), "BTC", "5m", 200)
+        assert result.nearest_zone["distance_pct"] == 1.43
+
+    def test_backward_compat_existing_fields_unchanged(self):
+        """Ensure original fields are still present and correct after parsing."""
+        analyzer = self._make_analyzer()
+        result = analyzer._parse_response(self._full_json(), "SOL", "1h", 150)
+        assert result.regime == "UPTREND"
+        assert result.confidence == 4
+        assert result.volatility == "MODERATE"
+        assert result.trend_strength == "MODERATE"
+        assert result.bias == "BULLISH"
+        assert result.scalp_direction == "LONG_ONLY"
+        assert result.reasoning != ""
+        assert result.pattern == "bull flag"
+        assert len(result.key_levels) == 2
 
 
 class TestProviderFactory:

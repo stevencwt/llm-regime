@@ -74,6 +74,15 @@ class RegimeResult:
     reasoning: str = ""
     pattern: str = ""  # e.g. "ascending triangle", "head and shoulders"
 
+    # Market structure (new — swing sequence analysis)
+    # {"hh_hl": bool, "lh_ll": bool, "broken": bool, "summary": str}
+    structure: dict = field(default_factory=dict)
+
+    # Nearest high-probability reaction zone (new — pullback entry support)
+    # {"price": float, "type": str, "quality": str, "distance_pct": float,
+    #  "rationale": str, "tradeable": bool}
+    nearest_zone: dict = field(default_factory=dict)
+
     # Metadata
     asset: str = ""
     timeframe: str = ""
