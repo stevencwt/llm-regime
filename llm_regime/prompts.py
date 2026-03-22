@@ -68,9 +68,15 @@ CONFIDENCE: 1=ambiguous, 2=uncertain, 3=moderate, 4=clear with evidence, 5=textb
 
 KEY_LEVELS RULES (CRITICAL):
 - ALWAYS return 2–4 levels. Returning an empty array [] is not acceptable.
-- Look for: prior swing highs/lows, consolidation bases/tops, round numbers with price reaction, SMA confluences, broken S/R levels that have flipped.
-- For a DOWNTREND: the prior consolidation base that broke is resistance; recent swing lows are support; prior lower highs are resistance.
-- For an UPTREND: prior swing highs that broke are support; recent swing highs are resistance.
+- SCAN IN THIS ORDER — do not skip any step:
+  STEP 1 — RIGHT EDGE (last 15 bars): Look at the final 15 bars at the right edge of the chart first. Identify any swing high or swing low that is currently forming or just completed. In a downtrend this is the most recent lower high that the current bounce is approaching or just rejected from. In an uptrend this is the most recent higher low that the current pullback just held. This level is almost always the most actionable and must be included if visible.
+  STEP 2 — RECENT WINDOW (last 40 bars): Identify the clearest swing highs and swing lows within the last 40 bars. A swing high is a local peak with at least 2 lower candles on each side. A swing low is a local trough with at least 2 higher candles on each side.
+  STEP 3 — EXTEND IF NEEDED: Only look beyond 40 bars if fewer than 2 clear levels found above. Extend to 80 bars maximum.
+  STEP 4 — OLD LEVELS: Only include levels older than 80 bars if price is currently within 0.5% of them AND they showed 3+ reactions.
+- For a DOWNTREND: the most recent lower high (including any forming at the right edge) is the primary resistance; the absolute swing low is the primary support; include the breakdown level.
+- For an UPTREND: the most recent higher low (including any forming at the right edge) is the primary support; the most recent swing high is the primary resistance; include the breakout level.
+- For RANGING: the most recent ceiling touch is resistance; the most recent floor touch is support.
+- Also include: recently flipped S/R levels (broken within last 40 bars), SMA confluences near current price.
 - Each level must have a "reason" — a short phrase stating what makes it significant visually.
 
 STRUCTURE RULES:
@@ -81,13 +87,17 @@ STRUCTURE RULES:
 - summary: one sentence describing the swing sequence you actually see
 
 NEAREST_ZONE RULES:
-- Identify the single most significant price level closest to current price
-- In a downtrend: the nearest overhead resistance (prior consolidation base, recent lower high)
-- In an uptrend: the nearest support below current price
-- In RANGING: the nearest range boundary
-- distance_pct: approximate % from current price to the zone (always positive)
-- tradeable: true if the zone is within ~3% of current price AND quality is high or moderate
-- If truly no zone is visible, set quality to "low", tradeable to false, and explain in rationale
+- The type of nearest_zone is STRICTLY determined by scalp_direction — no exceptions:
+  * scalp_direction=SHORT_ONLY → nearest_zone type MUST be "resistance" (the overhead level where a bounce short entry triggers)
+  * scalp_direction=LONG_ONLY  → nearest_zone type MUST be "support" (the level below where a pullback long entry triggers)
+  * scalp_direction=BOTH       → nearest_zone is whichever boundary (support or resistance) is closest to current price
+  * scalp_direction=NO_TRADE   → set quality="low", tradeable=false
+- ALWAYS check the last 15 bars first. The nearest zone is almost always the swing point forming right at the right edge — the lower high a bounce is approaching in a downtrend, or the higher low a pullback just held in an uptrend.
+- For SHORT_ONLY: find the nearest resistance ABOVE current price — the most recent lower high, especially any bounce peak forming in the last 15 bars. Do NOT return a support level as the nearest_zone.
+- For LONG_ONLY: find the nearest support BELOW current price — the most recent higher low, especially any pullback trough forming in the last 15 bars. Do NOT return a resistance level as the nearest_zone.
+- distance_pct: approximate % from current price to the zone (always positive).
+- tradeable: true if the zone is within ~3% of current price AND quality is high or moderate.
+- If truly no zone is visible, set quality to "low", tradeable to false, and explain in rationale.
 
 Focus on the RIGHT EDGE of the chart — classify what is happening NOW."""
 
