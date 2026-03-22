@@ -57,7 +57,7 @@ class GeminiProvider(BaseLLMProvider):
         user_prompt: str,
         model: Optional[str] = None,
         temperature: float = 0.1,
-        max_tokens: int = 2048,
+        max_tokens: int = 4096,
     ) -> LLMResponse:
         client = self._get_client()
         model_name = model or self._model
