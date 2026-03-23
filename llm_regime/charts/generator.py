@@ -169,7 +169,11 @@ def generate_chart_image(
     tick_positions = x[::tick_step]
     axes[-1].set_xticks(tick_positions)
 
-    plt.tight_layout()
+    # bbox_inches="tight" in savefig handles layout — suppress the redundant tight_layout warning
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        plt.tight_layout()
 
     # Render to bytes
     buf = io.BytesIO()
@@ -241,7 +245,10 @@ def generate_multi_timeframe_chart(
         ax.set_title(f"{asset} {tf} | {n} bars ({p_chg:+.1f}%)", fontsize=11)
         ax.legend(loc="upper left", fontsize=7, framealpha=0.8)
 
-    plt.tight_layout()
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        plt.tight_layout()
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight", facecolor="white")
     plt.close(fig)
